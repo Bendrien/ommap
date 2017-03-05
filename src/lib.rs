@@ -81,7 +81,7 @@ impl<K, V> Ommap<K, V>
 
     /// Removes all elements associated with the given key.
     ///
-    /// Returns all removed elements if there where some otherwise 'None'.
+    /// Returns all removed elements if there where some otherwise `None`.
     pub fn remove(&mut self, key: &K) -> Option<Vec<V>> {
         if let Some(range) = self.range(key) {
             self.keys.drain(range.clone());
@@ -91,19 +91,29 @@ impl<K, V> Ommap<K, V>
     }
 
     /// Gets all elements associated with the given key as `slice`.
+    ///
+    /// If there isn't an entry for the given key the returned slice will be empty.
     pub fn get<'a>(&'a self, key: &K) -> &'a [V] {
-        if let Some(range) = self.range(key) {
-            return &self.values[range];
+        if self.values.is_empty() {
+            &self.values
+        } else if let Some(range) = self.range(key) {
+            &self.values[range]
+        } else {
+            &self.values[..0]
         }
-        &self.values
     }
 
     /// Gets all elements associated with the given key as mutable `slice`.
+    ///
+    /// If there isn't an entry for the given key the returned slice will be empty.
     pub fn get_mut<'a>(&'a mut self, key: &K) -> &'a mut [V] {
-        if let Some(range) = self.range(key) {
-            return &mut self.values[range];
+        if self.values.is_empty() {
+            &mut self.values
+        } else if let Some(range) = self.range(key) {
+            &mut self.values[range]
+        } else {
+            &mut self.values[..0]
         }
-        &mut self.values
     }
 
     pub fn into_iter(self) -> Zip<vec::IntoIter<K>, vec::IntoIter<V>> {
