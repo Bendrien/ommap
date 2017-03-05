@@ -150,18 +150,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn insert() {
+    fn get() {
+        let mut map = Ommap::new();
+        assert_eq!(map.get(&42).is_empty(), true);
+
+        map.insert(3, 3);
+        map.insert(2, 2_1);
+        map.insert(1, 1);
+        map.insert(2, 2_2);
+        map.insert(4, 4);
+        map.insert(2, 2_3);
+
+        let mut iter = map.get(&2).iter();
+        assert_eq!(iter.next(), Some(&2_1));
+        assert_eq!(iter.next(), Some(&2_2));
+        assert_eq!(iter.next(), Some(&2_3));
+        assert_eq!(iter.next(), None);
+
+        assert_eq!(map.get(&42).is_empty(), true);
+    }
+
+    #[test]
+    fn get_mut() {
         let mut map = Ommap::new();
         map.insert(3, 3);
         map.insert(2, 2_1);
         map.insert(1, 1);
         map.insert(2, 2_2);
+        map.insert(4, 4);
         map.insert(2, 2_3);
 
-        let mut iter = map.get(&2).iter();
-        assert_eq!(iter.next(), Some(&21));
-        assert_eq!(iter.next(), Some(&22));
-        assert_eq!(iter.next(), Some(&23));
+        let mut iter = map.get_mut(&2).iter_mut();
+        assert_eq!(iter.next(), Some(&mut 2_1));
+        assert_eq!(iter.next(), Some(&mut 2_2));
+        assert_eq!(iter.next(), Some(&mut 2_3));
         assert_eq!(iter.next(), None);
     }
 
