@@ -5,17 +5,17 @@ use std::ops::Range;
 
 
 #[derive(Debug)]
-pub struct Ordermap<K, V> {
+pub struct Ommap<K, V> {
     keys: Vec<K>,
     values: Vec<V>,
 }
 
-impl<K, V> Ordermap<K, V>
+impl<K, V> Ommap<K, V>
     where K: Ord
 {
-    /// Constructs a new, empty `Ordermap<k,V>`.
+    /// Constructs a new, empty `Ommap<k,V>`.
     pub fn new() -> Self {
-        Ordermap {
+        Ommap {
             keys: Vec::new(),
             values: Vec::new(),
         }
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn insert() {
-        let mut map = Ordermap::new();
+        let mut map = Ommap::new();
         map.insert(3, 3);
         map.insert(2, 2_1);
         map.insert(1, 1);
@@ -157,7 +157,7 @@ mod tests {
 
     #[test]
     fn remove() {
-        let mut map = Ordermap::new();
+        let mut map = Ommap::new();
         map.insert(3, 3);
         map.insert(2, 2_1);
         map.insert(1, 1);
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn into_iter() {
-        let mut map = Ordermap::new();
+        let mut map = Ommap::new();
         map.insert(3, 'c');
         map.insert(1, 'a');
         map.insert(2, 'b');
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn iter() {
-        let mut map = Ordermap::new();
+        let mut map = Ommap::new();
         map.insert(3, 'c');
         map.insert(2, 'b');
         map.insert(1, 'a');
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn iter_mut() {
-        let mut map = Ordermap::new();
+        let mut map = Ommap::new();
         map.insert(1, 'a');
         map.insert(3, 'c');
         map.insert(2, 'b');
@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn values() {
-        let mut map = Ordermap::new();
+        let mut map = Ommap::new();
         map.insert(3, 'c');
         map.insert(2, 'b');
         map.insert(1, 'a');
@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn values_mut() {
-        let mut map = Ordermap::new();
+        let mut map = Ommap::new();
         map.insert(3, 'c');
         map.insert(2, 'b');
         map.insert(1, 'a');
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn keys() {
-        let mut map = Ordermap::new();
+        let mut map = Ommap::new();
         map.insert(3, 'c');
         map.insert(2, 'b');
         map.insert(1, 'a');
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn keys_mut() {
-        let mut map = Ordermap::new();
+        let mut map = Ommap::new();
         map.insert(3, 'c');
         map.insert(2, 'b');
         map.insert(1, 'a');
