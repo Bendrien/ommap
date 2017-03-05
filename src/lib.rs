@@ -173,6 +173,8 @@ mod tests {
     #[test]
     fn get_mut() {
         let mut map = Ommap::new();
+        assert_eq!(map.get_mut(&42).is_empty(), true);
+
         map.insert(3, 3);
         map.insert(2, 2_1);
         map.insert(1, 1);
@@ -180,11 +182,15 @@ mod tests {
         map.insert(4, 4);
         map.insert(2, 2_3);
 
-        let mut iter = map.get_mut(&2).iter_mut();
-        assert_eq!(iter.next(), Some(&mut 2_1));
-        assert_eq!(iter.next(), Some(&mut 2_2));
-        assert_eq!(iter.next(), Some(&mut 2_3));
-        assert_eq!(iter.next(), None);
+        {
+            let mut iter = map.get_mut(&2).iter_mut();
+            assert_eq!(iter.next(), Some(&mut 2_1));
+            assert_eq!(iter.next(), Some(&mut 2_2));
+            assert_eq!(iter.next(), Some(&mut 2_3));
+            assert_eq!(iter.next(), None);
+        }
+
+        assert_eq!(map.get_mut(&42).is_empty(), true);
     }
 
     #[test]
