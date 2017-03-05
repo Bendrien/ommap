@@ -1,0 +1,6 @@
+[package]
+name = "ommap"
+version = "0.1.0"
+authors = ["Anyere Bendrien <anyere.bendrien@posteo.de>"]
+
+[dependencies]
