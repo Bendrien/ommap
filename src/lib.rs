@@ -112,8 +112,9 @@ impl<K: Ord, V> Ommap<K, V> {
 
     /// Inserts an element into the map at the key's position maintaining sorted order.
     ///
-    /// If there is already an entry for that key (or multiple) it will be inserted right after.
-    pub fn insert(&mut self, key: K, value: V) {
+    /// If there is already an entry for that key (or multiple) it will be inserted right after
+    /// maintaining insertion order.
+    pub fn push(&mut self, key: K, value: V) {
         if self.keys.is_empty() || *self.keys.last().unwrap() <= key {
             self.keys.push(key);
             self.values.push(value);
@@ -296,12 +297,12 @@ mod tests {
         let mut map = Ommap::new();
         assert_eq!(map.get(&42).is_empty(), true);
 
-        map.insert(3, 3);
-        map.insert(2, 2_1);
-        map.insert(1, 1);
-        map.insert(2, 2_2);
-        map.insert(4, 4);
-        map.insert(2, 2_3);
+        map.push(3, 3);
+        map.push(2, 2_1);
+        map.push(1, 1);
+        map.push(2, 2_2);
+        map.push(4, 4);
+        map.push(2, 2_3);
 
         let mut iter = map.get(&2).iter();
         assert_eq!(iter.next(), Some(&2_1));
@@ -317,12 +318,12 @@ mod tests {
         let mut map = Ommap::new();
         assert_eq!(map.get_mut(&42).is_empty(), true);
 
-        map.insert(3, 3);
-        map.insert(2, 2_1);
-        map.insert(1, 1);
-        map.insert(2, 2_2);
-        map.insert(4, 4);
-        map.insert(2, 2_3);
+        map.push(3, 3);
+        map.push(2, 2_1);
+        map.push(1, 1);
+        map.push(2, 2_2);
+        map.push(4, 4);
+        map.push(2, 2_3);
 
         {
             let mut iter = map.get_mut(&2).iter_mut();
@@ -338,11 +339,11 @@ mod tests {
     #[test]
     fn remove() {
         let mut map = Ommap::new();
-        map.insert(3, 3);
-        map.insert(2, 2_1);
-        map.insert(1, 1);
-        map.insert(2, 2_2);
-        map.insert(2, 2_3);
+        map.push(3, 3);
+        map.push(2, 2_1);
+        map.push(1, 1);
+        map.push(2, 2_2);
+        map.push(2, 2_3);
 
         let v = map.remove(&2).unwrap();
         let mut iter = v.iter();
@@ -360,14 +361,14 @@ mod tests {
     #[test]
     fn remove_multi() {
         let mut map = Ommap::new();
-        map.insert(3, 3);
-        map.insert(4, 4_1);
-        map.insert(2, 2_1);
-        map.insert(5, 5);
-        map.insert(4, 4_2);
-        map.insert(1, 1);
-        map.insert(2, 2_2);
-        map.insert(2, 2_3);
+        map.push(3, 3);
+        map.push(4, 4_1);
+        map.push(2, 2_1);
+        map.push(5, 5);
+        map.push(4, 4_2);
+        map.push(1, 1);
+        map.push(2, 2_2);
+        map.push(2, 2_3);
 
         map.remove_multi(&[2,4]);
 
@@ -385,7 +386,7 @@ mod tests {
 
         for i in 0..1_000_000 {
             v.push(i);
-            map.insert(i, i);
+            map.push(i, i);
         }
         map.remove_multi(&v[..]);
 
@@ -396,9 +397,9 @@ mod tests {
     #[test]
     fn into_iter() {
         let mut map = Ommap::new();
-        map.insert(3, 'c');
-        map.insert(1, 'a');
-        map.insert(2, 'b');
+        map.push(3, 'c');
+        map.push(1, 'a');
+        map.push(2, 'b');
 
         let mut iter = map.into_iter();
         assert_eq!(iter.next(), Some((1, 'a')));
@@ -409,9 +410,9 @@ mod tests {
     #[test]
     fn iter() {
         let mut map = Ommap::new();
-        map.insert(3, 'c');
-        map.insert(2, 'b');
-        map.insert(1, 'a');
+        map.push(3, 'c');
+        map.push(2, 'b');
+        map.push(1, 'a');
 
         let mut iter = map.iter();
         assert_eq!(iter.next(), Some((&1, &'a')));
@@ -423,9 +424,9 @@ mod tests {
     #[test]
     fn iter_mut() {
         let mut map = Ommap::new();
-        map.insert(1, 'a');
-        map.insert(3, 'c');
-        map.insert(2, 'b');
+        map.push(1, 'a');
+        map.push(3, 'c');
+        map.push(2, 'b');
 
         let mut iter = map.iter_mut();
         assert_eq!(iter.next(), Some((&1, &mut 'a')));
@@ -436,9 +437,9 @@ mod tests {
     #[test]
     fn values() {
         let mut map = Ommap::new();
-        map.insert(3, 'c');
-        map.insert(2, 'b');
-        map.insert(1, 'a');
+        map.push(3, 'c');
+        map.push(2, 'b');
+        map.push(1, 'a');
 
         let mut iter = map.values();
         assert_eq!(iter.next(), Some(&'a'));
@@ -450,9 +451,9 @@ mod tests {
     #[test]
     fn values_mut() {
         let mut map = Ommap::new();
-        map.insert(3, 'c');
-        map.insert(2, 'b');
-        map.insert(1, 'a');
+        map.push(3, 'c');
+        map.push(2, 'b');
+        map.push(1, 'a');
 
         let mut iter = map.values_mut();
         assert_eq!(iter.next(), Some(&mut 'a'));
@@ -463,9 +464,9 @@ mod tests {
     #[test]
     fn keys() {
         let mut map = Ommap::new();
-        map.insert(3, 'c');
-        map.insert(2, 'b');
-        map.insert(1, 'a');
+        map.push(3, 'c');
+        map.push(2, 'b');
+        map.push(1, 'a');
 
         let mut iter = map.keys();
         assert_eq!(iter.next(), Some(&1));
@@ -477,15 +478,15 @@ mod tests {
     fn filter_zip() {
         let mut a = Ommap::new();
         let mut b = Ommap::new();
-        a.insert(1,1);
-        a.insert(1,5);
-        b.insert(1,6);
-        a.insert(2,4);
-        b.insert(2,7);
-        a.insert(3,3);
-        b.insert(3,8);
-        a.insert(5,2);
-        b.insert(5,9);
+        a.push(1, 1);
+        a.push(1, 5);
+        b.push(1, 6);
+        a.push(2, 4);
+        b.push(2, 7);
+        a.push(3, 3);
+        b.push(3, 8);
+        a.push(5, 2);
+        b.push(5, 9);
 
         let mut iter = a.iter().filter_zip(b.iter());
         assert_eq!(iter.next(), Some((&1, (&1,&6))));
