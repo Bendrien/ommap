@@ -3,17 +3,14 @@ use std::slice;
 use std::vec;
 use std::ops::Range;
 
-
 #[derive(Debug)]
 pub struct Ommap<K, V> {
     keys: Vec<K>,
     values: Vec<V>,
 }
 
-impl<K, V> Ommap<K, V>
-    where K: Ord
-{
-    /// Constructs a new, empty `Ommap<k,V>`.
+impl<K: Ord, V> Ommap<K, V> {
+    /// Constructs a new, empty `Ommap<K,V>`.
     pub fn new() -> Self {
         Ommap {
             keys: Vec::new(),
@@ -204,7 +201,13 @@ impl<K, V> Ommap<K, V>
             &mut self.values[..0]
         }
     }
+}
 
+/////////////////////////////////////////
+// Iterators
+/////////////////////////////////////////
+
+impl<K, V> Ommap<K, V> {
     pub fn into_iter(self) -> Zip<vec::IntoIter<K>, vec::IntoIter<V>> {
         self.keys.into_iter().zip(self.values.into_iter())
     }
@@ -213,16 +216,12 @@ impl<K, V> Ommap<K, V>
         self.keys.iter().zip(self.values.iter())
     }
 
-    pub fn iter_mut<'a>(&'a mut self) -> Zip<slice::IterMut<'a, K>, slice::IterMut<'a, V>> {
-        self.keys.iter_mut().zip(self.values.iter_mut())
+    pub fn iter_mut<'a>(&'a mut self) -> Zip<slice::Iter<'a, K>, slice::IterMut<'a, V>> {
+        self.keys.iter().zip(self.values.iter_mut())
     }
 
     pub fn keys<'a>(&'a self) -> slice::Iter<'a, K> {
         self.keys.iter()
-    }
-
-    pub fn keys_mut<'a>(&'a mut self) -> slice::IterMut<'a, K> {
-        self.keys.iter_mut()
     }
 
     pub fn values<'a>(&'a self) -> slice::Iter<'a, V> {
@@ -233,6 +232,60 @@ impl<K, V> Ommap<K, V>
         self.values.iter_mut()
     }
 }
+
+struct FilterZip<A, B> {
+    a: A,
+    b: B,
+}
+
+impl<K, V, W, A, B> Iterator for FilterZip<A, B>
+    where K: Ord,
+          A: Iterator<Item=(K, V)>,
+          B: Iterator<Item=(K, W)>,
+{
+    type Item = (K, (V, W));
+    fn next(&mut self) -> Option<Self::Item> {
+        if let (Some((mut ka, mut va)), Some((mut kb, mut vb))) = (self.a.next(), self.b.next()) {
+            while ka < kb {
+                if let Some((kn,vn)) = self.a.next() {
+                    ka = kn;
+                    va = vn;
+                } else { return None; }
+            }
+            while ka > kb {
+                if let Some((kn,vn)) = self.b.next() {
+                    kb = kn;
+                    vb = vn;
+                } else { return None; }
+            }
+            return Some((ka, (va, vb)));
+        }
+        None
+    }
+}
+
+trait ToFilterZip<B>: Sized {
+    /// Zips the iterators by matching their keys against each other in ascending order
+    /// and only yielding the equal ones.
+    fn filter_zip(self, B) -> FilterZip<Self, B>;
+}
+
+impl<K, V, W, A, B> ToFilterZip<B> for A
+    where K: Ord,
+          A: Iterator<Item=(K, V)>,
+          B: Iterator<Item=(K, W)>,
+{
+    fn filter_zip(self, b: B) -> FilterZip<A, B> {
+        FilterZip {
+            a: self,
+            b: b,
+        }
+    }
+}
+
+/////////////////////////////////////////
+// Tests
+/////////////////////////////////////////
 
 #[cfg(test)]
 mod tests {
@@ -375,9 +428,9 @@ mod tests {
         map.insert(2, 'b');
 
         let mut iter = map.iter_mut();
-        assert_eq!(iter.next(), Some((&mut 1, &mut 'a')));
-        assert_eq!(iter.next(), Some((&mut 2, &mut 'b')));
-        assert_eq!(iter.next(), Some((&mut 3, &mut 'c')));
+        assert_eq!(iter.next(), Some((&1, &mut 'a')));
+        assert_eq!(iter.next(), Some((&2, &mut 'b')));
+        assert_eq!(iter.next(), Some((&3, &mut 'c')));
     }
 
     #[test]
@@ -421,15 +474,24 @@ mod tests {
     }
 
     #[test]
-    fn keys_mut() {
-        let mut map = Ommap::new();
-        map.insert(3, 'c');
-        map.insert(2, 'b');
-        map.insert(1, 'a');
+    fn filter_zip() {
+        let mut a = Ommap::new();
+        let mut b = Ommap::new();
+        a.insert(1,1);
+        a.insert(1,5);
+        b.insert(1,6);
+        a.insert(2,4);
+        b.insert(2,7);
+        a.insert(3,3);
+        b.insert(3,8);
+        a.insert(5,2);
+        b.insert(5,9);
 
-        let mut iter = map.keys_mut();
-        assert_eq!(iter.next(), Some(&mut 1));
-        assert_eq!(iter.next(), Some(&mut 2));
-        assert_eq!(iter.next(), Some(&mut 3));
+        let mut iter = a.iter().filter_zip(b.iter());
+        assert_eq!(iter.next(), Some((&1, (&1,&6))));
+        assert_eq!(iter.next(), Some((&2, (&4,&7))));
+        assert_eq!(iter.next(), Some((&3, (&3,&8))));
+        assert_eq!(iter.next(), Some((&5, (&2,&9))));
+        assert_eq!(iter.next(), None);
     }
 }
