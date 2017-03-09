@@ -15,11 +15,20 @@ pub struct Ommap<K, V> {
 }
 
 impl<K: Ord, V> Ommap<K, V> {
-    /// Constructs a new, empty `Ommap<K,V>`.
+    /// Constructs a new, empty `Ommap<K, V>`.
     pub fn new() -> Self {
         Ommap {
             keys: Vec::new(),
             values: Vec::new(),
+        }
+    }
+
+    /// Converts the vec into an `Ommap<K, V>`.
+    pub fn from(other: Vec<(K, V)>) -> Self {
+        let unzip = other.into_iter().unzip();
+        Ommap {
+            keys: unzip.0,
+            values: unzip.1,
         }
     }
 
@@ -328,12 +337,10 @@ impl<K, V> Ommap<K, V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-
+    
     #[test]
     fn first_last() {
-        let mut map = Ommap::new();
-        map.insert_multi(vec!((1, 0), (3, 1), (3, 2), (3, 3), (5, 0)));
+        let map = Ommap::from(vec!((1, 0), (3, 1), (3, 2), (3, 3), (5, 0)));
         assert_eq!(map.first(&1), Some(&0));
         assert_eq!(map.first(&3), Some(&1));
         assert_eq!(map.first(&5), Some(&0));
