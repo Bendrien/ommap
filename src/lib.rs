@@ -37,7 +37,7 @@ impl<K: Ord, V> Ommap<K, V> {
     /// Returns `None` if there is no entry for the key.
     #[inline]
     fn index(&self, key: &K) -> Option<usize> {
-        if self.is_inner_bounds(key) {
+        if self.in_inner_bounds(key) {
             return self.keys.binary_search(key).ok();
         }
         None
@@ -75,7 +75,7 @@ impl<K: Ord, V> Ommap<K, V> {
     }
 
     #[inline]
-    fn is_inner_bounds(&self, key: &K) -> bool {
+    fn in_inner_bounds(&self, key: &K) -> bool {
         if let Some(first) = self.keys.first() {
             return first <= key && key <= self.keys.last().unwrap();
         }
@@ -123,7 +123,7 @@ impl<K: Ord, V> Ommap<K, V> {
     }
 
     pub fn pop(&mut self, key: &K) -> Option<V> {
-        if !self.is_inner_bounds(key) {
+        if !self.in_inner_bounds(key) {
             return None;
         }
         if self.keys.last().unwrap() == key {
@@ -169,8 +169,9 @@ impl<K: Ord, V> Ommap<K, V> {
     ///
     /// Assumes the given keys are in sorted order.
     pub fn remove_multi(&mut self, keys: &[K]) {
-        if keys.is_empty() || !self.is_inner_bounds(keys.first().unwrap())
-            || !self.is_inner_bounds(keys.last().unwrap()) {
+        if keys.is_empty() || !self.in_inner_bounds(keys.first().unwrap())
+            || !self.in_inner_bounds(keys.last().unwrap())
+        {
             return;
         }
         if let Some(start) = keys.iter()
@@ -209,11 +210,11 @@ impl<K: Ord, V> Ommap<K, V> {
     fn index_count<'a>(&self, elem: &[(K, V)]) -> Vec<(usize, usize)> {
         let mut vec = Vec::new();
         let mut iter = elem.iter().peekable();
-        let mut cnt = 0;
+        let mut cnt = 1;
         while let Some(key) = iter.next().map(|&(ref key,_)| key) {
-            cnt += 1;
             if let Some(peek) = iter.peek().map(|&&(ref key,_)| key) {
                 if key == peek {
+                    cnt += 1;
                     continue;
                 }
             }
@@ -222,7 +223,7 @@ impl<K: Ord, V> Ommap<K, V> {
                 Err(index) => index,
             };
             vec.push((index, cnt.clone()));
-            cnt = 0;
+            cnt = 1;
         }
         vec
     }
@@ -337,7 +338,7 @@ impl<K, V> Ommap<K, V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn first_last() {
         let map = Ommap::from(vec!((1, 0), (3, 1), (3, 2), (3, 3), (5, 0)));
@@ -352,26 +353,38 @@ mod tests {
     #[test]
     fn insert_multi() {
         let mut map = Ommap::new();
-        map.insert_multi(vec!((1, 1), (2, 2), (3, 3)));
 
+        map.insert_multi(Vec::new());
+        assert!(map.is_empty());
+
+        map.insert_multi(vec!((1, 1)));
         {
             let mut iter = map.iter();
             assert_eq!(iter.next(), Some((&1, &1)));
+            assert_eq!(iter.next(), None);
+        }
+
+        map.insert_multi(vec!((1, 12), (2, 2), (3, 3)));
+        {
+            let mut iter = map.iter();
+            assert_eq!(iter.next(), Some((&1, &1)));
+            assert_eq!(iter.next(), Some((&1, &12)));
             assert_eq!(iter.next(), Some((&2, &2)));
             assert_eq!(iter.next(), Some((&3, &3)));
             assert_eq!(iter.next(), None);
         }
 
-        map.insert_multi(vec!((0, 0), (2, 22), (4, 4)));
+        map.insert_multi(vec!((0, 0), (2, 22), (4, 4), (4, 42)));
 
-        println!("{:?}", map);
         let mut iter = map.iter();
         assert_eq!(iter.next(), Some((&0, &0)));
         assert_eq!(iter.next(), Some((&1, &1)));
+        assert_eq!(iter.next(), Some((&1, &12)));
         assert_eq!(iter.next(), Some((&2, &2)));
         assert_eq!(iter.next(), Some((&2, &22)));
         assert_eq!(iter.next(), Some((&3, &3)));
         assert_eq!(iter.next(), Some((&4, &4)));
+        assert_eq!(iter.next(), Some((&4, &42)));
         assert_eq!(iter.next(), None);
     }
 
