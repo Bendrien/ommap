@@ -36,7 +36,7 @@ impl<K: Ord, V> Ommap<K, V> {
 
     /// Get the first index associated with the given key next to the given index (inclusive).
     #[inline]
-    fn start_index(&self, key: &K, index: usize) -> usize {
+    fn first_index(&self, key: &K, index: usize) -> usize {
         self.keys[..index].iter()
             .rev()
             .take_while(|&k| k == key)
@@ -45,7 +45,7 @@ impl<K: Ord, V> Ommap<K, V> {
 
     /// Get the last index associated with the given key next to the given index (exclusive).
     #[inline]
-    fn end_index(&self, key: &K, index: usize) -> usize {
+    fn last_index_exclusive(&self, key: &K, index: usize) -> usize {
         self.keys[index..].iter()
             .take_while(|&k| k == key)
             .fold(index, |acc, _| acc + 1 )
@@ -58,11 +58,19 @@ impl<K: Ord, V> Ommap<K, V> {
     fn range(&self, key: &K) -> Option<Range<usize>> {
         if let Some(index) = self.index(key) {
             return Some(Range {
-                start: self.start_index(key, index),
-                end: self.end_index(key, index),
+                start: self.first_index(key, index),
+                end: self.last_index_exclusive(key, index),
             });
         }
         None
+    }
+
+    #[inline]
+    fn is_inner_bounds(&self, key: &K) -> bool {
+        if let Some(first) = self.keys.first() {
+            return first <= key && key <= self.keys.last().unwrap();
+        }
+        false
     }
 
     /// Returns the number of elements in the map.
@@ -97,7 +105,7 @@ impl<K: Ord, V> Ommap<K, V> {
             self.values.push(value);
         } else {
             let index = match self.keys.binary_search(&key) {
-                Ok(index) => self.end_index(&key, index),
+                Ok(index) => self.last_index_exclusive(&key, index),
                 Err(index) => index,
             };
             self.keys.insert(index, key);
@@ -106,17 +114,39 @@ impl<K: Ord, V> Ommap<K, V> {
     }
 
     pub fn pop(&mut self, key: &K) -> Option<V> {
-        if self.keys.is_empty() || self.keys.last().unwrap() < key { return None; }
+        if self.keys.is_empty() || self.keys.last().unwrap() < key {
+            return None;
+        }
         if self.keys.last().unwrap() == key {
             self.keys.pop();
             return self.values.pop();
         }
         let index = match self.keys.binary_search(key) {
-            Ok(index) => self.end_index(key, index) - 1,
+            Ok(index) => self.last_index_exclusive(key, index) - 1,
             Err(_) => return None,
         };
         self.keys.remove(index);
         Some(self.values.remove(index))
+    }
+
+    /// Returns the first value associated with the key, or None if it doesn't exist.
+    pub fn first(&self, key: &K) -> Option<&V> {
+        if self.is_inner_bounds(key) {
+            if let Ok(index) = self.keys.binary_search(key) {
+                return Some(&self.values[self.first_index(key, index)]);
+            };
+        }
+        None
+    }
+
+    /// Returns the last value associated with the key, or None if it doesn't exist.
+    pub fn last(&self, key: &K) -> Option<&V> {
+        if self.is_inner_bounds(key) {
+            if let Ok(index) = self.keys.binary_search(key) {
+                return Some(&self.values[self.last_index_exclusive(key, index) - 1]);
+            };
+        }
+        None
     }
 
     /// Removes all elements associated with the given key preserving sorted order.
@@ -139,7 +169,7 @@ impl<K: Ord, V> Ommap<K, V> {
         if let Some(start) = keys.iter()
             .map(|key| (key, self.keys.binary_search(key)))
             .find(|&(_,search_result)| search_result.is_ok())
-            .map(|(key,search_result)| self.start_index(key, search_result.ok().unwrap()))
+            .map(|(key,search_result)| self.first_index(key, search_result.ok().unwrap()))
         {
             let len = self.len();
             let mut del = 0;
@@ -181,7 +211,7 @@ impl<K: Ord, V> Ommap<K, V> {
                 }
             }
             let index = match self.keys.binary_search(key) {
-                Ok(index) => self.end_index(key, index),
+                Ok(index) => self.last_index_exclusive(key, index),
                 Err(index) => index,
             };
             vec.push((index, cnt.clone()));
@@ -300,6 +330,19 @@ impl<K, V> Ommap<K, V> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn first_last() {
+        let mut map = Ommap::new();
+        map.insert_multi(vec!((1, 0), (3, 1), (3, 2), (3, 3), (5, 0)));
+        assert_eq!(map.first(&1), Some(&0));
+        assert_eq!(map.first(&3), Some(&1));
+        assert_eq!(map.first(&5), Some(&0));
+        assert_eq!(map.last(&1), Some(&0));
+        assert_eq!(map.last(&3), Some(&3));
+        assert_eq!(map.last(&5), Some(&0));
+    }
 
     #[test]
     fn insert_multi() {
