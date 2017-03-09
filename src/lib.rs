@@ -1,7 +1,12 @@
+extern crate core;
+
+mod iter;
+
 use std::iter::Zip;
 use std::slice;
 use std::vec;
 use std::ops::Range;
+use core::ptr;
 
 #[derive(Debug)]
 pub struct Ommap<K, V> {
@@ -32,20 +37,18 @@ impl<K: Ord, V> Ommap<K, V> {
     /// Get the first index associated with the given key next to the given index (inclusive).
     #[inline]
     fn start_index(&self, key: &K, index: usize) -> usize {
-        index -
-            self.keys[..index].iter()
-                .rev()
-                .position(|k| *k != *key)
-                .unwrap_or(0)
+        self.keys[..index].iter()
+            .rev()
+            .take_while(|&k| k == key)
+            .fold(index, |acc, _| acc - 1 )
     }
 
     /// Get the last index associated with the given key next to the given index (exclusive).
     #[inline]
     fn end_index(&self, key: &K, index: usize) -> usize {
-        index +
-            self.keys[index..].iter()
-                .position(|k| *k != *key)
-                .unwrap_or(1)
+        self.keys[index..].iter()
+            .take_while(|&k| k == key)
+            .fold(index, |acc, _| acc + 1 )
     }
 
     /// Get the range associated with the given key.
@@ -62,42 +65,15 @@ impl<K: Ord, V> Ommap<K, V> {
         None
     }
 
-    /// Get the range including all given keys.
-    ///
-    /// Assumes the given keys are in sorted order.
-    /// Returns `None` if there is no entry for any given key.
-    #[allow(dead_code)]
-    fn range_multi(&self, keys: &[&K]) -> Option<Range<usize>> {
-        if keys.is_empty() || self.keys.is_empty() { return None; }
-
-        if *self.keys.last().unwrap() < **keys.last().unwrap() { return None; }
-
-        if let Some(start) = keys.iter()
-            .map(|&key| (key, self.keys.binary_search(key)))
-            .find(|&(_,search_result)| search_result.is_ok())
-            .map(|(key,search_result)| self.start_index(key, search_result.ok().unwrap()))
-        {
-            if let Some(end) = keys.iter()
-                .rev()
-                .map(|&key| (key, self.keys.binary_search(key)))
-                .find(|&(_,search_result)| search_result.is_ok())
-                .map(|(key,search_result)| self.end_index(key, search_result.ok().unwrap()))
-            {
-                return Some(Range { start: start, end: end })
-            }
-        }
-        None
-    }
-
     /// Returns the number of elements in the map.
+    #[inline]
     pub fn len(&self) -> usize {
         self.keys.len()
     }
 
-    /// Swaps two elements in a slice.
-    pub fn swap(&mut self, a: usize, b: usize) {
-        self.keys.swap(a, b);
-        self.values.swap(a, b);
+    /// Returns `true` if the map contains no elements.
+    pub fn is_empty(&self) -> bool {
+        self.keys.is_empty()
     }
 
     /// Shortens the vector, keeping the first `len` elements and dropping
@@ -105,6 +81,7 @@ impl<K: Ord, V> Ommap<K, V> {
     ///
     /// If `len` is greater than the vector's current length, this has no
     /// effect.
+    #[inline]
     pub fn truncate(&mut self, len: usize) {
         self.keys.truncate(len);
         self.values.truncate(len);
@@ -128,6 +105,20 @@ impl<K: Ord, V> Ommap<K, V> {
         }
     }
 
+    pub fn pop(&mut self, key: &K) -> Option<V> {
+        if self.keys.is_empty() || self.keys.last().unwrap() < key { return None; }
+        if self.keys.last().unwrap() == key {
+            self.keys.pop();
+            return self.values.pop();
+        }
+        let index = match self.keys.binary_search(key) {
+            Ok(index) => self.end_index(key, index) - 1,
+            Err(_) => return None,
+        };
+        self.keys.remove(index);
+        Some(self.values.remove(index))
+    }
+
     /// Removes all elements associated with the given key preserving sorted order.
     ///
     /// Returns all removed elements if there where some otherwise `None`.
@@ -143,18 +134,17 @@ impl<K: Ord, V> Ommap<K, V> {
     ///
     /// Assumes the given keys are in sorted order.
     pub fn remove_multi(&mut self, keys: &[K]) {
-        if keys.is_empty() || self.keys.is_empty() { return; }
-        if *self.keys.last().unwrap() < *keys.last().unwrap() { return; }
+        if keys.is_empty() || self.keys.is_empty()
+            || self.keys.last().unwrap() < keys.last().unwrap() { return; }
         if let Some(start) = keys.iter()
-            .map(|key| (key, self.keys.binary_search(&key)))
+            .map(|key| (key, self.keys.binary_search(key)))
             .find(|&(_,search_result)| search_result.is_ok())
-            .map(|(key,search_result)| self.start_index(&key, search_result.ok().unwrap()))
+            .map(|(key,search_result)| self.start_index(key, search_result.ok().unwrap()))
         {
             let len = self.len();
             let mut del = 0;
             {
                 let mut iter = keys.iter().peekable();
-
                 for i in start..len {
                     while let Some(&k) = iter.peek() {
                         if *k < self.keys[i] {
@@ -167,13 +157,78 @@ impl<K: Ord, V> Ommap<K, V> {
                     if iter.peek().is_some() && **iter.peek().unwrap() == self.keys[i] {
                         del += 1;
                     } else if del > 0 {
-                        self.swap(i - del, i);
+                        let j = i - del;
+                        self.keys.swap(j, i);
+                        self.values.swap(j, i);
                     }
                 }
             }
             if del > 0 {
                 self.truncate(len - del);
             }
+        }
+    }
+
+    fn index_count<'a>(&self, elem: &[(K, V)]) -> Vec<(usize, usize)> {
+        let mut vec = Vec::new();
+        let mut iter = elem.iter().peekable();
+        let mut cnt = 0;
+        while let Some(key) = iter.next().map(|&(ref key,_)| key) {
+            cnt += 1;
+            if let Some(peek) = iter.peek().map(|&&(ref key,_)| key) {
+                if key == peek {
+                    continue;
+                }
+            }
+            let index = match self.keys.binary_search(key) {
+                Ok(index) => self.end_index(key, index),
+                Err(index) => index,
+            };
+            vec.push((index, cnt.clone()));
+            cnt = 0;
+        }
+        vec
+    }
+
+    /// Inserts all elements into the map at theirs key position maintaining sorted order.
+    ///
+    /// If there is already an entry (or multiple) for any key the corresponding element
+    /// will be inserted right after maintaining insertion order.
+    pub fn insert_multi(&mut self, elem: Vec<(K, V)>) {
+        let len = self.len();
+        let elem_count = elem.len();
+        let new_len = len + elem_count;
+
+        self.keys.reserve_exact(elem_count);
+        self.values.reserve_exact(elem_count);
+
+        let mut index_count_iter = self.index_count(&elem).into_iter().rev();
+        let mut elem_iter = elem.into_iter().rev();
+
+        let mut remaining_all = elem_count as isize;
+        let mut end_index = len;
+
+        unsafe {
+            while let Some((index, index_count)) = index_count_iter.next() {
+                let key_ptr = self.keys.as_mut_ptr().offset(index as isize);
+                let value_ptr = self.values.as_mut_ptr().offset(index as isize);
+
+                if index < end_index {
+                    let count = end_index - index;
+                    ptr::copy(key_ptr, key_ptr.offset(remaining_all), count);
+                    ptr::copy(value_ptr, value_ptr.offset(remaining_all), count);
+                    end_index -= count;
+                }
+
+                for _ in 0..index_count {
+                    remaining_all -= 1;
+                    let (key, value) = elem_iter.next().unwrap();
+                    ptr::write(key_ptr.offset(remaining_all), key);
+                    ptr::write(value_ptr.offset(remaining_all), value);
+                }
+            }
+            self.keys.set_len(new_len);
+            self.values.set_len(new_len);
         }
     }
 
@@ -204,9 +259,11 @@ impl<K: Ord, V> Ommap<K, V> {
     }
 }
 
-/////////////////////////////////////////
-// Iterators
-/////////////////////////////////////////
+
+    /////////////////////////////////////
+    // Iterators
+    /////////////////////////////////////
+
 
 impl<K, V> Ommap<K, V> {
     pub fn into_iter(self) -> Zip<vec::IntoIter<K>, vec::IntoIter<V>> {
@@ -234,63 +291,58 @@ impl<K, V> Ommap<K, V> {
     }
 }
 
-struct FilterZip<A, B> {
-    a: A,
-    b: B,
-}
 
-impl<K, V, W, A, B> Iterator for FilterZip<A, B>
-    where K: Ord,
-          A: Iterator<Item=(K, V)>,
-          B: Iterator<Item=(K, W)>,
-{
-    type Item = (K, (V, W));
-    fn next(&mut self) -> Option<Self::Item> {
-        if let (Some((mut ka, mut va)), Some((mut kb, mut vb))) = (self.a.next(), self.b.next()) {
-            while ka < kb {
-                if let Some((kn,vn)) = self.a.next() {
-                    ka = kn;
-                    va = vn;
-                } else { return None; }
-            }
-            while ka > kb {
-                if let Some((kn,vn)) = self.b.next() {
-                    kb = kn;
-                    vb = vn;
-                } else { return None; }
-            }
-            return Some((ka, (va, vb)));
-        }
-        None
-    }
-}
+    /////////////////////////////////////
+    // Tests
+    /////////////////////////////////////
 
-trait ToFilterZip<B>: Sized {
-    /// Zips the iterators by matching their keys against each other in ascending order
-    /// and only yielding the equal ones.
-    fn filter_zip(self, B) -> FilterZip<Self, B>;
-}
-
-impl<K, V, W, A, B> ToFilterZip<B> for A
-    where K: Ord,
-          A: Iterator<Item=(K, V)>,
-          B: Iterator<Item=(K, W)>,
-{
-    fn filter_zip(self, b: B) -> FilterZip<A, B> {
-        FilterZip {
-            a: self,
-            b: b,
-        }
-    }
-}
-
-/////////////////////////////////////////
-// Tests
-/////////////////////////////////////////
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn insert_multi() {
+        let mut map = Ommap::new();
+        map.insert_multi(vec!((1, 1), (2, 2), (3, 3)));
+
+        {
+            let mut iter = map.iter();
+            assert_eq!(iter.next(), Some((&1, &1)));
+            assert_eq!(iter.next(), Some((&2, &2)));
+            assert_eq!(iter.next(), Some((&3, &3)));
+            assert_eq!(iter.next(), None);
+        }
+
+        map.insert_multi(vec!((0, 0), (2, 22), (4, 4)));
+
+        println!("{:?}", map);
+        let mut iter = map.iter();
+        assert_eq!(iter.next(), Some((&0, &0)));
+        assert_eq!(iter.next(), Some((&1, &1)));
+        assert_eq!(iter.next(), Some((&2, &2)));
+        assert_eq!(iter.next(), Some((&2, &22)));
+        assert_eq!(iter.next(), Some((&3, &3)));
+        assert_eq!(iter.next(), Some((&4, &4)));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn pop_elem() {
+        let mut map = Ommap::new();
+        map.push(3, 3);
+        map.push(2, 2_1);
+        map.push(1, 1);
+        map.push(2, 2_2);
+
+        assert_eq!(map.pop(&1), Some(1));
+        assert_eq!(map.pop(&1), None);
+        assert_eq!(map.pop(&3), Some(3));
+        assert_eq!(map.pop(&3), None);
+        assert_eq!(map.pop(&2), Some(2_2));
+        assert_eq!(map.pop(&2), Some(2_1));
+        assert_eq!(map.pop(&2), None);
+    }
 
     #[test]
     fn get() {
@@ -380,16 +432,20 @@ mod tests {
     }
 
     #[test]
-    fn remove_on_heavy_load() {
+    fn remove_insert_on_heavy_load() {
+        let count = 1_000_000;
         let mut map = Ommap::new();
-        let mut v = Vec::new();
-
-        for i in 0..1_000_000 {
-            v.push(i);
-            map.push(i, i);
+        let mut is = Vec::with_capacity(count);
+        let mut rs = Vec::with_capacity(count);
+        for i in 0..count {
+            is.push((i, i));
+            rs.push(i);
         }
-        map.remove_multi(&v[..]);
 
+        map.insert_multi(is);
+        assert_eq!(map.len(), count);
+
+        map.remove_multi(&rs);
         assert_eq!(map.len(), 0);
     }
 
@@ -472,27 +528,5 @@ mod tests {
         assert_eq!(iter.next(), Some(&1));
         assert_eq!(iter.next(), Some(&2));
         assert_eq!(iter.next(), Some(&3));
-    }
-
-    #[test]
-    fn filter_zip() {
-        let mut a = Ommap::new();
-        let mut b = Ommap::new();
-        a.push(1, 1);
-        a.push(1, 5);
-        b.push(1, 6);
-        a.push(2, 4);
-        b.push(2, 7);
-        a.push(3, 3);
-        b.push(3, 8);
-        a.push(5, 2);
-        b.push(5, 9);
-
-        let mut iter = a.iter().filter_zip(b.iter());
-        assert_eq!(iter.next(), Some((&1, (&1,&6))));
-        assert_eq!(iter.next(), Some((&2, (&4,&7))));
-        assert_eq!(iter.next(), Some((&3, (&3,&8))));
-        assert_eq!(iter.next(), Some((&5, (&2,&9))));
-        assert_eq!(iter.next(), None);
     }
 }
