@@ -28,10 +28,10 @@ impl<K: Ord, V> Ommap<K, V> {
     /// Returns `None` if there is no entry for the key.
     #[inline]
     fn index(&self, key: &K) -> Option<usize> {
-        if self.keys.is_empty() || *self.keys.last().unwrap() < *key {
-            return None;
+        if self.is_inner_bounds(key) {
+            return self.keys.binary_search(key).ok();
         }
-        self.keys.binary_search(key).ok()
+        None
     }
 
     /// Get the first index associated with the given key next to the given index (inclusive).
@@ -114,7 +114,7 @@ impl<K: Ord, V> Ommap<K, V> {
     }
 
     pub fn pop(&mut self, key: &K) -> Option<V> {
-        if self.keys.is_empty() || self.keys.last().unwrap() < key {
+        if !self.is_inner_bounds(key) {
             return None;
         }
         if self.keys.last().unwrap() == key {
@@ -131,20 +131,16 @@ impl<K: Ord, V> Ommap<K, V> {
 
     /// Returns the first value associated with the key, or None if it doesn't exist.
     pub fn first(&self, key: &K) -> Option<&V> {
-        if self.is_inner_bounds(key) {
-            if let Ok(index) = self.keys.binary_search(key) {
-                return Some(&self.values[self.first_index(key, index)]);
-            };
+        if let Some(index) = self.index(key) {
+            return Some(&self.values[self.first_index(key, index)]);
         }
         None
     }
 
     /// Returns the last value associated with the key, or None if it doesn't exist.
     pub fn last(&self, key: &K) -> Option<&V> {
-        if self.is_inner_bounds(key) {
-            if let Ok(index) = self.keys.binary_search(key) {
-                return Some(&self.values[self.last_index_exclusive(key, index) - 1]);
-            };
+        if let Some(index) = self.index(key) {
+            return Some(&self.values[self.last_index_exclusive(key, index) - 1]);
         }
         None
     }
@@ -164,8 +160,10 @@ impl<K: Ord, V> Ommap<K, V> {
     ///
     /// Assumes the given keys are in sorted order.
     pub fn remove_multi(&mut self, keys: &[K]) {
-        if keys.is_empty() || self.keys.is_empty()
-            || self.keys.last().unwrap() < keys.last().unwrap() { return; }
+        if keys.is_empty() || !self.is_inner_bounds(keys.first().unwrap())
+            || !self.is_inner_bounds(keys.last().unwrap()) {
+            return;
+        }
         if let Some(start) = keys.iter()
             .map(|key| (key, self.keys.binary_search(key)))
             .find(|&(_,search_result)| search_result.is_ok())
