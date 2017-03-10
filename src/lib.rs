@@ -23,15 +23,6 @@ impl<K: Ord, V> Ommap<K, V> {
         }
     }
 
-    /// Converts the vec into an `Ommap<K, V>`.
-    pub fn from(other: Vec<(K, V)>) -> Self {
-        let unzip = other.into_iter().unzip();
-        Ommap {
-            keys: unzip.0,
-            values: unzip.1,
-        }
-    }
-
     /// Get the index of a given key.
     ///
     /// Returns `None` if there is no entry for the key.
@@ -207,7 +198,8 @@ impl<K: Ord, V> Ommap<K, V> {
         }
     }
 
-    fn index_count<'a>(&self, elem: &[(K, V)]) -> Vec<(usize, usize)> {
+    /// Collects each key(s) as a tuple of the keys last index and quantity in a `Vec`.
+    fn index_count(&self, elem: &[(K, V)]) -> Vec<(usize, usize)> {
         let mut vec = Vec::new();
         let mut iter = elem.iter().peekable();
         let mut cnt = 1;
@@ -297,23 +289,56 @@ impl<K: Ord, V> Ommap<K, V> {
     }
 }
 
+impl<K, V> From<Vec<(K, V)>> for Ommap<K, V> {
+    fn from(other: Vec<(K, V)>) -> Self {
+        let unzip = other.into_iter().unzip();
+        Ommap {
+            keys: unzip.0,
+            values: unzip.1,
+        }
+    }
+}
+
 
     /////////////////////////////////////
     // Iterators
     /////////////////////////////////////
 
 
-impl<K, V> Ommap<K, V> {
-    pub fn into_iter(self) -> Zip<vec::IntoIter<K>, vec::IntoIter<V>> {
+impl<K, V> IntoIterator for Ommap<K, V> {
+    type Item = (K, V);
+    type IntoIter = Zip<vec::IntoIter<K>, vec::IntoIter<V>>;
+
+    fn into_iter(self) -> Self::IntoIter {
         self.keys.into_iter().zip(self.values.into_iter())
     }
+}
 
-    pub fn iter<'a>(&'a self) -> Zip<slice::Iter<'a, K>, slice::Iter<'a, V>> {
+impl<'a, K, V> IntoIterator for &'a Ommap<K, V> {
+    type Item = (&'a K, &'a V);
+    type IntoIter = Zip<slice::Iter<'a, K>, slice::Iter<'a, V>>;
+
+    fn into_iter(self) -> Self::IntoIter {
         self.keys.iter().zip(self.values.iter())
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a mut Ommap<K, V> {
+    type Item = (&'a K, &'a mut V);
+    type IntoIter = Zip<slice::Iter<'a, K>, slice::IterMut<'a, V>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.keys.iter().zip(self.values.iter_mut())
+    }
+}
+
+impl<K, V> Ommap<K, V> {
+    pub fn iter<'a>(&'a self) -> Zip<slice::Iter<'a, K>, slice::Iter<'a, V>> {
+        self.into_iter()
     }
 
     pub fn iter_mut<'a>(&'a mut self) -> Zip<slice::Iter<'a, K>, slice::IterMut<'a, V>> {
-        self.keys.iter().zip(self.values.iter_mut())
+        self.into_iter()
     }
 
     pub fn keys<'a>(&'a self) -> slice::Iter<'a, K> {
@@ -389,7 +414,7 @@ mod tests {
     }
 
     #[test]
-    fn pop_elem() {
+    fn pop() {
         let mut map = Ommap::new();
         map.push(3, 3);
         map.push(2, 2_1);
@@ -408,7 +433,7 @@ mod tests {
     #[test]
     fn get() {
         let mut map = Ommap::new();
-        assert_eq!(map.get(&42).is_empty(), true);
+        assert_eq!(map.get(&42), &[]);
 
         map.push(3, 3);
         map.push(2, 2_1);
@@ -423,13 +448,13 @@ mod tests {
         assert_eq!(iter.next(), Some(&2_3));
         assert_eq!(iter.next(), None);
 
-        assert_eq!(map.get(&42).is_empty(), true);
+        assert_eq!(map.get(&42), &[]);
     }
 
     #[test]
     fn get_mut() {
         let mut map = Ommap::new();
-        assert_eq!(map.get_mut(&42).is_empty(), true);
+        assert_eq!(map.get(&42), &mut []);
 
         map.push(3, 3);
         map.push(2, 2_1);
@@ -446,7 +471,7 @@ mod tests {
             assert_eq!(iter.next(), None);
         }
 
-        assert_eq!(map.get_mut(&42).is_empty(), true);
+        assert_eq!(map.get(&42), &mut []);
     }
 
     #[test]
