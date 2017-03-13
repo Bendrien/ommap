@@ -1,3 +1,5 @@
+use std::iter::Peekable;
+
 pub trait ToFilterZip<B>: Sized {
     /// Zips the iterators by matching their keys against each other in ascending order
     /// and only yielding the equal ones.
@@ -53,6 +55,38 @@ impl<K, V, W, A, B> ToFilterZip<B> for A
             a: self,
             b: b.into_iter(),
         }
+    }
+}
+
+pub trait ToFilterCount<T: Iterator> {
+    fn filter_count(self) -> FilterCount<T>;
+}
+
+pub struct FilterCount<I: Iterator> {
+    iter: Peekable<I>,
+}
+
+impl<I: Iterator> Iterator for FilterCount<I> where I::Item: PartialEq {
+    type Item = (I::Item, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut cnt = 1;
+        while let Some(item) = self.iter.next() {
+            if let Some(peek) = self.iter.peek() {
+                if item == *peek {
+                    cnt += 1;
+                    continue;
+                }
+            }
+            return Some((item, cnt));
+        }
+        None
+    }
+}
+
+impl<I: Iterator> ToFilterCount<I> for I {
+    fn filter_count(self) -> FilterCount<I> {
+        FilterCount { iter: self.peekable() }
     }
 }
 
@@ -168,6 +202,22 @@ mod tests {
         assert_eq!(iter.next(), Some((&2, (&4, &mut 7))));
         assert_eq!(iter.next(), Some((&3, (&3, &mut 8))));
         assert_eq!(iter.next(), Some((&5, (&2, &mut 9))));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn filter_count() {
+        let v = vec!(1,
+                     2, 2,
+                     3, 3, 3,
+                     4, 4, 4, 4,
+                     5, 5, 5, 5, 5);
+        let mut iter = v.iter().filter_count();
+        assert_eq!(iter.next(), Some((&1, 1)));
+        assert_eq!(iter.next(), Some((&2, 2)));
+        assert_eq!(iter.next(), Some((&3, 3)));
+        assert_eq!(iter.next(), Some((&4, 4)));
+        assert_eq!(iter.next(), Some((&5, 5)));
         assert_eq!(iter.next(), None);
     }
 }
