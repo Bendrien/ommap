@@ -1,7 +1,7 @@
 pub trait ToFilterZip<B>: Sized {
     /// Zips the iterators by matching their keys against each other in ascending order
     /// and only yielding the equal ones.
-    fn filter_zip(self, B) -> FilterZip<Self, B>;
+    fn filter_zip(self, B) -> FilterZip<Self, B::IntoIter> where B: IntoIterator;
 }
 
 pub struct FilterZip<A, B> {
@@ -45,13 +45,13 @@ impl<K, V, W, A, B> ToFilterZip<B> for A
     where K: Ord,
           A: Iterator,
           A::Item: Unpair<Left = K, Right = V>,
-          B: Iterator,
+          B: IntoIterator,
           B::Item: Unpair<Left = K, Right = W>,
 {
-    fn filter_zip(self, b: B) -> FilterZip<A, B> {
+    fn filter_zip(self, b: B) -> FilterZip<A, B::IntoIter> {
         FilterZip {
             a: self,
-            b: b,
+            b: b.into_iter(),
         }
     }
 }
@@ -163,7 +163,7 @@ mod tests {
         a.push(5, 2);
         b.push(5, 9);
 
-        let mut iter = a.iter().filter_zip(b.iter_mut());
+        let mut iter = a.iter().filter_zip(&mut b);
         assert_eq!(iter.next(), Some((&1, (&1, &mut 6))));
         assert_eq!(iter.next(), Some((&2, (&4, &mut 7))));
         assert_eq!(iter.next(), Some((&3, (&3, &mut 8))));
