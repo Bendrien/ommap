@@ -5,7 +5,7 @@ mod iter;
 use std::iter::Zip;
 use std::slice;
 use std::vec;
-use std::ops::Range;
+use std::ops::{Range, Index, IndexMut};
 use core::ptr;
 
 #[derive(Debug)]
@@ -235,7 +235,7 @@ impl<K: Ord, V> Ommap<K, V> {
         let mut index_count_iter = self.index_count(&elem).into_iter().rev();
         let mut elem_iter = elem.into_iter().rev();
 
-        let mut remaining_all = elem_count as isize;
+        let mut remaining = elem_count as isize;
         let mut end_index = len;
 
         unsafe {
@@ -245,16 +245,16 @@ impl<K: Ord, V> Ommap<K, V> {
 
                 if index < end_index {
                     let count = end_index - index;
-                    ptr::copy(key_ptr, key_ptr.offset(remaining_all), count);
-                    ptr::copy(value_ptr, value_ptr.offset(remaining_all), count);
+                    ptr::copy(key_ptr, key_ptr.offset(remaining), count);
+                    ptr::copy(value_ptr, value_ptr.offset(remaining), count);
                     end_index -= count;
                 }
 
                 for _ in 0..index_count {
-                    remaining_all -= 1;
+                    remaining -= 1;
                     let (key, value) = elem_iter.next().unwrap();
-                    ptr::write(key_ptr.offset(remaining_all), key);
-                    ptr::write(value_ptr.offset(remaining_all), value);
+                    ptr::write(key_ptr.offset(remaining), key);
+                    ptr::write(value_ptr.offset(remaining), value);
                 }
             }
             self.keys.set_len(new_len);
@@ -296,6 +296,19 @@ impl<K, V> From<Vec<(K, V)>> for Ommap<K, V> {
             keys: unzip.0,
             values: unzip.1,
         }
+    }
+}
+
+impl<K: Ord, V> Index<K> for Ommap<K,V> {
+    type Output = [V];
+    fn index<'a>(&'a self, key: K) -> &'a Self::Output {
+        self.get(&key)
+    }
+}
+
+impl<K: Ord, V> IndexMut<K> for Ommap<K,V> {
+    fn index_mut<'a>(&'a mut self, key: K) -> &'a mut Self::Output {
+        self.get_mut(&key)
     }
 }
 
@@ -472,6 +485,20 @@ mod tests {
         }
 
         assert_eq!(map.get(&42), &mut []);
+    }
+
+    #[test]
+    fn index() {
+        let map = Ommap::from(vec!((1u8, 'a'), (1u8, 'b')));
+        assert_eq!(&map[1u8], &['a', 'b']);
+        assert_eq!(&map[2u8], &[]);
+    }
+
+    #[test]
+    fn index_mut() {
+        let mut map = Ommap::from(vec!((1u8, 'a'), (1u8, 'b')));
+        assert_eq!(&mut map[1u8], &mut ['a', 'b']);
+        assert_eq!(&mut map[2u8], &mut []);
     }
 
     #[test]
