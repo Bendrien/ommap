@@ -12,11 +12,12 @@ pub struct FilterZip<A, B> {
 }
 
 impl<K, L, V, W, A, B> Iterator for FilterZip<A, B>
-    where K: PartialOrd<L>,
-          A: Iterator,
-          A::Item: Unpair<Left = K, Right = V>,
-          B: Iterator,
-          B::Item: Unpair<Left = L, Right = W>,
+    where
+        K: PartialOrd<L>,
+        A: Iterator,
+        A::Item: Unpair<Left = K, Right = V>,
+        B: Iterator,
+        B::Item: Unpair<Left = L, Right = W>,
 {
     type Item = (K, (V, W));
     fn next(&mut self) -> Option<Self::Item> {
@@ -44,11 +45,12 @@ impl<K, L, V, W, A, B> Iterator for FilterZip<A, B>
 }
 
 impl<K, L, V, W, A, B> ToFilterZip<B> for A
-    where K: PartialOrd<L>,
-          A: Iterator,
-          A::Item: Unpair<Left = K, Right = V>,
-          B: IntoIterator,
-          B::Item: Unpair<Left = L, Right = W>,
+    where
+        K: PartialOrd<L>,
+        A: Iterator,
+        A::Item: Unpair<Left = K, Right = V>,
+        B: IntoIterator,
+        B::Item: Unpair<Left = L, Right = W>,
 {
     fn filter_zip(self, b: B) -> FilterZip<A, B::IntoIter> {
         FilterZip {
@@ -89,6 +91,8 @@ impl<I: Iterator> ToFilterCount<I> for I {
         FilterCount { iter: self.peekable() }
     }
 }
+
+
 
 
     /////////////////////////////////////
@@ -143,13 +147,6 @@ impl<A, B, C> Flatten<(A, B, C)> for (A, (B, C)) {
     }
 }
 
-impl<A, B, C, D> Flatten<(A, B, C, D)> for (A, (B, (C, D))) {
-    fn flatten(self) -> (A, B, C, D) {
-        let (a, (b, (c, d))) = self;
-        (a, b, c, d)
-    }
-}
-
 impl<A, B, C, D> Flatten<(A, B, C, D)> for (A, ((B, C), D)) {
     fn flatten(self) -> (A, B, C, D) {
         let (a, ((b, c), d)) = self;
@@ -157,10 +154,31 @@ impl<A, B, C, D> Flatten<(A, B, C, D)> for (A, ((B, C), D)) {
     }
 }
 
+impl<A, B, C, D, E> Flatten<(A, B, C, D, E)> for (A, (((B, C), D), E)) {
+    fn flatten(self) -> (A, B, C, D, E) {
+        let (a, (((b, c), d), e)) = self;
+        (a, b, c, d, e)
+    }
+}
+
+impl<A, B, C, D, E, F> Flatten<(A, B, C, D, E, F)> for (A, ((((B, C), D), E), F)) {
+    fn flatten(self) -> (A, B, C, D, E, F) {
+        let (a, ((((b, c), d), e), f)) = self;
+        (a, b, c, d, e, f)
+    }
+}
+
+impl<A, B, C, D, E, F, G> Flatten<(A, B, C, D, E, F, G)> for (A, (((((B, C), D), E), F), G)) {
+    fn flatten(self) -> (A, B, C, D, E, F, G) {
+        let (a, (((((b, c), d), e), f), g)) = self;
+        (a, b, c, d, e, f, g)
+    }
+}
+
 
     /////////////////////////////////////
     // Tests
-    /////////////////////////////////////S
+    /////////////////////////////////////
 
 
 #[cfg(test)]
@@ -170,37 +188,38 @@ mod tests {
     #[test]
     fn flatten() {
         assert_eq!(('a', (2usize, 3u8)).flatten(), ('a', 2, 3));
-        //assert_eq!(('a', (2usize, (3u8, 'd'))).flatten(), ('a', 2, 3, 'd'));
-//
-//        use Ommap;
-//        // (Key, A, B)
-//        let a = Ommap::from(vec!((1,'a'), (2,'a'), (3,'a')));
-//        let b = Ommap::from(vec!((1,'b'), (2,'b'), (3,'b')));
-//        let mut iter = a.iter().filter_zip(&b);
-//
-//        assert_eq!(iter.next().unwrap().flatten(), (&1, &'a', &'b'));
-//        assert_eq!(iter.next().unwrap().flatten(), (&2, &'a', &'b'));
-//        assert_eq!(iter.next().unwrap().flatten(), (&3, &'a', &'b'));
-//        assert_eq!(iter.next(), None);
-//
-//        // (Key, A, B, C)
-//        let a = Ommap::from(vec!((1,'a'), (2,'a'), (3,'a')));
-//        let b = Ommap::from(vec!((1,'b'), (2,'b'), (3,'b')));
-//        let mut c = Ommap::from(vec!((1,'c'), (2,'c'), (3,'c')));
-//        let mut iter = a.iter().filter_zip(&b).filter_zip(&mut c);
-//
-//        {
-//            let (k,a,b,c) = iter.next().unwrap().flatten();
-//            assert_eq!((k,a,b,c), (&1, &'a', &'b', &mut 'c'));
-//        }
-//
-//        let (k,a,b,c) = iter.next().unwrap().flatten();
-//        assert_eq!((k,a,b,c), (&2, &'a', &'b', &mut 'c'));
-//
-//        let (k,a,b,c) = iter.next().unwrap().flatten();
-//        assert_eq!((k,a,b,c), (&3, &'a', &'b', &mut 'c'));
-//
-//        assert_eq!(iter.next(), None);
+        assert_eq!(
+            Flatten::<(char, usize, u8, char)>::flatten(('a', ((2, 3), 'd'))),
+            ('a', 2, 3, 'd'));
+
+        use Ommap;
+
+        // (Key, A, B)
+        let a = Ommap::from(vec!((1,'a'), (2,'a'), (3,'a')));
+        let b = Ommap::from(vec!((1,'b'), (2,'b'), (3,'b')));
+        let mut iter = a.iter().filter_zip(&b);
+
+        assert_eq!(iter.next().unwrap().flatten(), (&1, &'a', &'b'));
+        assert_eq!(iter.next().unwrap().flatten(), (&2, &'a', &'b'));
+        assert_eq!(iter.next().unwrap().flatten(), (&3, &'a', &'b'));
+        assert_eq!(iter.next(), None);
+
+        // (Key, A, B, C)
+        let a = Ommap::from(vec!((1u8,'a'), (2,'a'), (3,'a')));
+        let b = Ommap::from(vec!((1u8,'b'), (2,'b'), (3,'b')));
+        let mut c = Ommap::from(vec!((1u8,'c'), (2,'c'), (3,'c')));
+        let mut iter = a.iter().filter_zip(&b).filter_zip(&mut c);
+
+        assert_eq!(
+            Flatten::<(&u8, &char, &char, &mut char)>::flatten(iter.next().unwrap()),
+            (&1, &'a', &'b', &mut 'c'));
+        assert_eq!(
+            Flatten::<(&u8, &char, &char, &mut char)>::flatten(iter.next().unwrap()),
+            (&2, &'a', &'b', &mut 'c'));
+        assert_eq!(
+            Flatten::<(&u8, &char, &char, &mut char)>::flatten(iter.next().unwrap()),
+            (&3, &'a', &'b', &mut 'c'));
+        assert_eq!(iter.next(), None);
     }
 
     #[test]
