@@ -3,7 +3,7 @@ use std::iter::Peekable;
 pub trait ToFilterZip<B>: Sized {
     /// Zips the iterators by matching their keys against each other in ascending order
     /// and only yielding the equal ones.
-    fn filter_zip(self, B) -> FilterZip<Self, B::IntoIter> where B: IntoIterator;
+    fn fiz(self, B) -> FilterZip<Self, B::IntoIter> where B: IntoIterator;
 }
 
 pub struct FilterZip<A, B> {
@@ -52,7 +52,7 @@ impl<K, L, V, W, A, B> ToFilterZip<B> for A
         B: IntoIterator,
         B::Item: Unpair<Left = L, Right = W>,
 {
-    fn filter_zip(self, b: B) -> FilterZip<A, B::IntoIter> {
+    fn fiz(self, b: B) -> FilterZip<A, B::IntoIter> {
         FilterZip {
             a: self,
             b: b.into_iter(),
@@ -91,8 +91,6 @@ impl<I: Iterator> ToFilterCount<I> for I {
         FilterCount { iter: self.peekable() }
     }
 }
-
-
 
 
     /////////////////////////////////////
@@ -189,15 +187,25 @@ mod tests {
     fn flatten() {
         assert_eq!(('a', (2usize, 3u8)).flatten(), ('a', 2, 3));
         assert_eq!(
-            Flatten::<(char, usize, u8, char)>::flatten(('a', ((2, 3), 'd'))),
+            Flatten::<(_,_,_,_)>::flatten(('a', ((2, 3), 'd'))),
             ('a', 2, 3, 'd'));
+        assert_eq!(
+            Flatten::<(_,_,_,_,_)>::flatten(('a', (((2, 3), 'd'), 'e'))),
+            ('a', 2, 3, 'd', 'e'));
+        assert_eq!(
+            Flatten::<(_,_,_,_,_,_)>::flatten(('a', ((((2, 3), 'd'), 'e'), 'f'))),
+            ('a', 2, 3, 'd', 'e', 'f'));
+        assert_eq!(
+            Flatten::<(_,_,_,_,_,_,_)>::flatten(('a', (((((2, 3), 'd'), 'e'), 'f'), 'g'))),
+            ('a', 2, 3, 'd', 'e', 'f', 'g'));
+
 
         use Ommap;
 
         // (Key, A, B)
         let a = Ommap::from(vec!((1,'a'), (2,'a'), (3,'a')));
         let b = Ommap::from(vec!((1,'b'), (2,'b'), (3,'b')));
-        let mut iter = a.iter().filter_zip(&b);
+        let mut iter = a.iter().fiz(&b);
 
         assert_eq!(iter.next().unwrap().flatten(), (&1, &'a', &'b'));
         assert_eq!(iter.next().unwrap().flatten(), (&2, &'a', &'b'));
@@ -208,16 +216,16 @@ mod tests {
         let a = Ommap::from(vec!((1u8,'a'), (2,'a'), (3,'a')));
         let b = Ommap::from(vec!((1u8,'b'), (2,'b'), (3,'b')));
         let mut c = Ommap::from(vec!((1u8,'c'), (2,'c'), (3,'c')));
-        let mut iter = a.iter().filter_zip(&b).filter_zip(&mut c);
+        let mut iter = a.iter().fiz(&b).fiz(&mut c);
 
         assert_eq!(
-            Flatten::<(&u8, &char, &char, &mut char)>::flatten(iter.next().unwrap()),
+            Flatten::<(_,_,_,_)>::flatten(iter.next().unwrap()),
             (&1, &'a', &'b', &mut 'c'));
         assert_eq!(
-            Flatten::<(&u8, &char, &char, &mut char)>::flatten(iter.next().unwrap()),
+            Flatten::<(_,_,_,_)>::flatten(iter.next().unwrap()),
             (&2, &'a', &'b', &mut 'c'));
         assert_eq!(
-            Flatten::<(&u8, &char, &char, &mut char)>::flatten(iter.next().unwrap()),
+            Flatten::<(_,_,_,_)>::flatten(iter.next().unwrap()),
             (&3, &'a', &'b', &mut 'c'));
         assert_eq!(iter.next(), None);
     }
@@ -234,30 +242,30 @@ mod tests {
         b.push((2, 'b'));
 
         {
-            let mut iter = a.iter().filter_zip(b.iter());
+            let mut iter = a.iter().fiz(b.iter());
             assert_eq!(iter.next(), Some((&1, (&'a', &'b'))));
             assert_eq!(iter.next(), None);
         }
 
         {
-            let mut iter = a.iter().filter_zip(b.iter_mut());
+            let mut iter = a.iter().fiz(b.iter_mut());
             assert_eq!(iter.next(), Some((&1, (&'a', &mut 'b'))));
             assert_eq!(iter.next(), None);
         }
 
         {
-            let mut iter = a.iter_mut().filter_zip(b.iter());
+            let mut iter = a.iter_mut().fiz(b.iter());
             assert_eq!(iter.next(), Some((&1, (&mut 'a', &'b'))));
             assert_eq!(iter.next(), None);
         }
 
         {
-            let mut iter = a.iter_mut().filter_zip(b.iter_mut());
+            let mut iter = a.iter_mut().fiz(b.iter_mut());
             assert_eq!(iter.next(), Some((&1, (&mut 'a', &mut 'b'))));
             assert_eq!(iter.next(), None);
         }
 
-        let mut iter = a.into_iter().filter_zip(b.into_iter());
+        let mut iter = a.into_iter().fiz(b.into_iter());
         assert_eq!(iter.next(), Some((1, ('a', 'b'))));
         assert_eq!(iter.next(), None);
     }
@@ -278,7 +286,7 @@ mod tests {
         a.push(5, 2);
         b.push(5, 9);
 
-        let mut iter = a.iter().filter_zip(&mut b);
+        let mut iter = a.iter().fiz(&mut b);
         assert_eq!(iter.next(), Some((&1, (&1, &mut 6))));
         assert_eq!(iter.next(), Some((&2, (&4, &mut 7))));
         assert_eq!(iter.next(), Some((&3, (&3, &mut 8))));
