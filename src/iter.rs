@@ -135,39 +135,39 @@ impl<'a, T, U> Unpair for &'a mut (T, U) {
 
 
 trait Flatten<T> {
-    fn flatten(self) -> T;
+    fn flat(self) -> T;
 }
 
 impl<A, B, C> Flatten<(A, B, C)> for (A, (B, C)) {
-    fn flatten(self) -> (A, B, C) {
+    fn flat(self) -> (A, B, C) {
         let (a, (b, c)) = self;
         (a, b, c)
     }
 }
 
 impl<A, B, C, D> Flatten<(A, B, C, D)> for (A, ((B, C), D)) {
-    fn flatten(self) -> (A, B, C, D) {
+    fn flat(self) -> (A, B, C, D) {
         let (a, ((b, c), d)) = self;
         (a, b, c, d)
     }
 }
 
 impl<A, B, C, D, E> Flatten<(A, B, C, D, E)> for (A, (((B, C), D), E)) {
-    fn flatten(self) -> (A, B, C, D, E) {
+    fn flat(self) -> (A, B, C, D, E) {
         let (a, (((b, c), d), e)) = self;
         (a, b, c, d, e)
     }
 }
 
 impl<A, B, C, D, E, F> Flatten<(A, B, C, D, E, F)> for (A, ((((B, C), D), E), F)) {
-    fn flatten(self) -> (A, B, C, D, E, F) {
+    fn flat(self) -> (A, B, C, D, E, F) {
         let (a, ((((b, c), d), e), f)) = self;
         (a, b, c, d, e, f)
     }
 }
 
 impl<A, B, C, D, E, F, G> Flatten<(A, B, C, D, E, F, G)> for (A, (((((B, C), D), E), F), G)) {
-    fn flatten(self) -> (A, B, C, D, E, F, G) {
+    fn flat(self) -> (A, B, C, D, E, F, G) {
         let (a, (((((b, c), d), e), f), g)) = self;
         (a, b, c, d, e, f, g)
     }
@@ -185,18 +185,18 @@ mod tests {
 
     #[test]
     fn flatten() {
-        assert_eq!(('a', (2usize, 3u8)).flatten(), ('a', 2, 3));
+        assert_eq!(('a', (2usize, 3u8)).flat(), ('a', 2, 3));
         assert_eq!(
-            Flatten::<(_,_,_,_)>::flatten(('a', ((2, 3), 'd'))),
+            Flatten::<(_,_,_,_)>::flat(('a', ((2, 3), 'd'))),
             ('a', 2, 3, 'd'));
         assert_eq!(
-            Flatten::<(_,_,_,_,_)>::flatten(('a', (((2, 3), 'd'), 'e'))),
+            Flatten::<(_,_,_,_,_)>::flat(('a', (((2, 3), 'd'), 'e'))),
             ('a', 2, 3, 'd', 'e'));
         assert_eq!(
-            Flatten::<(_,_,_,_,_,_)>::flatten(('a', ((((2, 3), 'd'), 'e'), 'f'))),
+            Flatten::<(_,_,_,_,_,_)>::flat(('a', ((((2, 3), 'd'), 'e'), 'f'))),
             ('a', 2, 3, 'd', 'e', 'f'));
         assert_eq!(
-            Flatten::<(_,_,_,_,_,_,_)>::flatten(('a', (((((2, 3), 'd'), 'e'), 'f'), 'g'))),
+            Flatten::<(_,_,_,_,_,_,_)>::flat(('a', (((((2, 3), 'd'), 'e'), 'f'), 'g'))),
             ('a', 2, 3, 'd', 'e', 'f', 'g'));
 
 
@@ -207,9 +207,9 @@ mod tests {
         let b = Ommap::from(vec!((1,'b'), (2,'b'), (3,'b')));
         let mut iter = a.iter().fiz(&b);
 
-        assert_eq!(iter.next().unwrap().flatten(), (&1, &'a', &'b'));
-        assert_eq!(iter.next().unwrap().flatten(), (&2, &'a', &'b'));
-        assert_eq!(iter.next().unwrap().flatten(), (&3, &'a', &'b'));
+        assert_eq!(iter.next().unwrap().flat(), (&1, &'a', &'b'));
+        assert_eq!(iter.next().unwrap().flat(), (&2, &'a', &'b'));
+        assert_eq!(iter.next().unwrap().flat(), (&3, &'a', &'b'));
         assert_eq!(iter.next(), None);
 
         // (Key, A, B, C)
@@ -219,13 +219,13 @@ mod tests {
         let mut iter = a.iter().fiz(&b).fiz(&mut c);
 
         assert_eq!(
-            Flatten::<(_,_,_,_)>::flatten(iter.next().unwrap()),
+            Flatten::<(_,_,_,_)>::flat(iter.next().unwrap()),
             (&1, &'a', &'b', &mut 'c'));
         assert_eq!(
-            Flatten::<(_,_,_,_)>::flatten(iter.next().unwrap()),
+            Flatten::<(_,_,_,_)>::flat(iter.next().unwrap()),
             (&2, &'a', &'b', &mut 'c'));
         assert_eq!(
-            Flatten::<(_,_,_,_)>::flatten(iter.next().unwrap()),
+            Flatten::<(_,_,_,_)>::flat(iter.next().unwrap()),
             (&3, &'a', &'b', &mut 'c'));
         assert_eq!(iter.next(), None);
     }
