@@ -173,6 +173,13 @@ impl<A, B, C, D, E, F, G> Flatten<(A, B, C, D, E, F, G)> for (A, (((((B, C), D),
     }
 }
 
+impl<A, B, C, D, E, F, G, H> Flatten<(A, B, C, D, E, F, G, H)> for (A, ((((((B, C), D), E), F), G), H)) {
+    fn flat(self) -> (A, B, C, D, E, F, G, H) {
+        let (a, ((((((b, c), d), e), f), g), h)) = self;
+        (a, b, c, d, e, f, g, h)
+    }
+}
+
 
     /////////////////////////////////////
     // Tests
@@ -198,6 +205,9 @@ mod tests {
         assert_eq!(
             Flatten::<(_,_,_,_,_,_,_)>::flat(('a', (((((2, 3), 'd'), 'e'), 'f'), 'g'))),
             ('a', 2, 3, 'd', 'e', 'f', 'g'));
+        assert_eq!(
+            Flatten::<(_,_,_,_,_,_,_,_)>::flat(('a', ((((((2, 3), 'd'), 'e'), 'f'), 'g'), 'h'))),
+            ('a', 2, 3, 'd', 'e', 'f', 'g', 'h'));
 
 
         use Ommap;
