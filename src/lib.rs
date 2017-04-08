@@ -6,7 +6,6 @@ use std::iter::Zip;
 use std::slice;
 use std::vec;
 use std::ops::{Range, Index, IndexMut};
-use std::mem;
 use core::ptr;
 
 #[derive(Debug)]
@@ -366,70 +365,6 @@ impl<K, V> Ommap<K, V> {
     pub fn values_mut<'a>(&'a mut self) -> slice::IterMut<'a, V> {
         self.values.iter_mut()
     }
-
-    pub fn multi<'a>(&'a self) -> Multi<'a, K, V> {
-        Multi {
-            keys: &self.keys,
-            values: &self.values,
-        }
-    }
-
-    pub fn multi_mut<'a>(&'a mut self) -> MultiMut<'a, K, V> {
-        MultiMut {
-            keys: &self.keys,
-            values: &mut self.values,
-        }
-    }
-}
-
-pub struct Multi<'a, K: 'a, V: 'a> {
-    keys: &'a [K],
-    values: &'a [V],
-}
-
-impl<'a, K: PartialEq, V> Iterator for Multi<'a, K, V> {
-    type Item = (&'a K, &'a [V]);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(key) = self.keys.first() {
-            if let Some(index) = self.keys.iter().position(|k| k != key) {
-                let (_, ks) = self.keys.split_at(index);
-                self.keys = ks;
-                let (v, vs) = self.values.split_at(index);
-                self.values = vs;
-                return Some((key, v));
-            }
-            self.keys = &self.keys[..0];
-            return Some((key, self.values));
-        }
-        None
-    }
-}
-
-pub struct MultiMut<'a, K: 'a, V: 'a> {
-    keys: &'a [K],
-    values: &'a mut [V],
-}
-
-impl<'a, K: PartialEq, V> Iterator for MultiMut<'a, K, V> {
-    type Item = (&'a K, &'a mut [V]);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(key) = self.keys.first() {
-            if let Some(len) = self.keys.iter().position(|k| k != key) {
-                let (_, ks) = self.keys.split_at(len);
-                self.keys = ks;
-                unsafe {
-                    let vs = mem::transmute(&mut self.values[..len]);
-                    self.values = mem::transmute(&mut self.values[len..]);
-                    return Some((key, vs));
-                }
-            }
-            self.keys = &self.keys[..0];
-            unsafe { return Some((key, mem::transmute(&mut self.values[..]))); }
-        }
-        None
-    }
 }
 
 
@@ -441,26 +376,6 @@ impl<'a, K: PartialEq, V> Iterator for MultiMut<'a, K, V> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn multi() {
-        let map = Ommap::from(vec!((1, 0), (3, 1), (3, 2), (3, 3), (5, 0)));
-        let mut iter = map.multi();
-        assert_eq!(iter.next(), Some((&1, &[0][..])));
-        assert_eq!(iter.next(), Some((&3, &[1, 2, 3][..])));
-        assert_eq!(iter.next(), Some((&5, &[0][..])));
-        assert_eq!(iter.next(), None);
-    }
-
-    #[test]
-    fn multi_mut() {
-        let mut map = Ommap::from(vec!((1, 0), (3, 1), (3, 2), (3, 3), (5, 0)));
-        let mut iter = map.multi_mut();
-        assert_eq!(iter.next(), Some((&1, &mut [0][..])));
-        assert_eq!(iter.next(), Some((&3, &mut [1, 2, 3][..])));
-        assert_eq!(iter.next(), Some((&5, &mut [0][..])));
-        assert_eq!(iter.next(), None);
-    }
 
     #[test]
     fn first_last() {
