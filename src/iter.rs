@@ -4,7 +4,10 @@ use std::mem;
 pub trait ToFilterZip<B>: Sized {
     /// Zips the iterators by matching their keys against each other in ascending order
     /// and only yielding the equal ones.
-    fn fiz(self, B) -> FilterZip<Self, B::IntoIter> where B: IntoIterator;
+    fn fiz(self, B) -> FilterZip<Self::IntoIter, B::IntoIter>
+        where
+            Self: IntoIterator,
+            B: IntoIterator;
 }
 
 pub struct FilterZip<A, B> {
@@ -48,14 +51,14 @@ impl<K, L, V, W, A, B> Iterator for FilterZip<A, B>
 impl<K, L, V, W, A, B> ToFilterZip<B> for A
     where
         K: PartialOrd<L>,
-        A: Iterator,
+        A: IntoIterator,
         A::Item: Unpair<Left = K, Right = V>,
         B: IntoIterator,
         B::Item: Unpair<Left = L, Right = W>,
 {
-    fn fiz(self, b: B) -> FilterZip<A, B::IntoIter> {
+    fn fiz(self, b: B) -> FilterZip<A::IntoIter, B::IntoIter> {
         FilterZip {
-            a: self,
+            a: self.into_iter(),
             b: b.into_iter(),
         }
     }
@@ -200,7 +203,7 @@ impl<'a, T, U> Unpair for &'a mut (T, U) {
 }
 
 
-trait Flatten<T> {
+pub trait Flatten<T> {
     fn flat(self) -> T;
 }
 

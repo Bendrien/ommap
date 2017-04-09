@@ -1,6 +1,7 @@
 extern crate core;
 
-mod iter;
+pub mod iter;
+pub mod itertools;
 
 use std::iter::Zip;
 use std::slice;
@@ -291,10 +292,10 @@ impl<K: Ord, V> Ommap<K, V> {
 
 impl<K, V> From<Vec<(K, V)>> for Ommap<K, V> {
     fn from(other: Vec<(K, V)>) -> Self {
-        let unzip = other.into_iter().unzip();
+        let (keys, values) = other.into_iter().unzip();
         Ommap {
-            keys: unzip.0,
-            values: unzip.1,
+            keys: keys,
+            values: values,
         }
     }
 }
