@@ -15,6 +15,22 @@ pub struct FilterZip<A, B> {
     b: B,
 }
 
+impl<K, L, V, W, A, B> ToFilterZip<B> for A
+    where
+        K: PartialOrd<L>,
+        A: IntoIterator,
+        A::Item: Unpair<Left = K, Right = V>,
+        B: IntoIterator,
+        B::Item: Unpair<Left = L, Right = W>,
+{
+    fn fiz(self, b: B) -> FilterZip<A::IntoIter, B::IntoIter> {
+        FilterZip {
+            a: self.into_iter(),
+            b: b.into_iter(),
+        }
+    }
+}
+
 impl<K, L, V, W, A, B> Iterator for FilterZip<A, B>
     where
         K: PartialOrd<L>,
@@ -45,22 +61,6 @@ impl<K, L, V, W, A, B> Iterator for FilterZip<A, B>
             return Some((a.0, (a.1, b.1)));
         }
         None
-    }
-}
-
-impl<K, L, V, W, A, B> ToFilterZip<B> for A
-    where
-        K: PartialOrd<L>,
-        A: IntoIterator,
-        A::Item: Unpair<Left = K, Right = V>,
-        B: IntoIterator,
-        B::Item: Unpair<Left = L, Right = W>,
-{
-    fn fiz(self, b: B) -> FilterZip<A::IntoIter, B::IntoIter> {
-        FilterZip {
-            a: self.into_iter(),
-            b: b.into_iter(),
-        }
     }
 }
 
@@ -207,6 +207,18 @@ pub trait Flatten<T> {
     fn flat(self) -> T;
 }
 
+impl<A> Flatten<(A,)> for (A,) {
+    fn flat(self) -> (A,) {
+        self
+    }
+}
+
+impl<A, B> Flatten<(A, B)> for (A, B) {
+    fn flat(self) -> (A, B) {
+        self
+    }
+}
+
 impl<A, B, C> Flatten<(A, B, C)> for (A, (B, C)) {
     fn flat(self) -> (A, B, C) {
         let (a, (b, c)) = self;
@@ -281,7 +293,9 @@ mod tests {
 
     #[test]
     fn flatten() {
-        assert_eq!(('a', (2usize, 3u8)).flat(), ('a', 2, 3));
+        assert_eq!(
+            Flatten::<(_,_,_)>::flat(('a', (2usize, 3u8))),
+            ('a', 2, 3));
         assert_eq!(
             Flatten::<(_,_,_,_)>::flat(('a', ((2, 3), 'd'))),
             ('a', 2, 3, 'd'));
@@ -306,9 +320,15 @@ mod tests {
         let b = Ommap::from(vec!((1,'b'), (2,'b'), (3,'b')));
         let mut iter = a.iter().fiz(&b);
 
-        assert_eq!(iter.next().unwrap().flat(), (&1, &'a', &'b'));
-        assert_eq!(iter.next().unwrap().flat(), (&2, &'a', &'b'));
-        assert_eq!(iter.next().unwrap().flat(), (&3, &'a', &'b'));
+        assert_eq!(
+            Flatten::<(_,_,_)>::flat(iter.next().unwrap()),
+            (&1, &'a', &'b'));
+        assert_eq!(
+            Flatten::<(_,_,_)>::flat(iter.next().unwrap()),
+            (&2, &'a', &'b'));
+        assert_eq!(
+            Flatten::<(_,_,_)>::flat(iter.next().unwrap()),
+            (&3, &'a', &'b'));
         assert_eq!(iter.next(), None);
 
         // (Key, A, B, C)

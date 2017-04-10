@@ -1,7 +1,6 @@
 extern crate core;
 
 pub mod iter;
-pub mod itertools;
 
 use std::iter::Zip;
 use std::slice;
